@@ -79,7 +79,7 @@ def disable_sdpa():
 
 
 class MultiHeadAttention(nn.Module):
-    use_sdpa = True
+    use_sdpa = False
 
     def __init__(self, n_state: int, n_head: int):
         super().__init__()
@@ -107,7 +107,7 @@ class MultiHeadAttention(nn.Module):
             # for cross-attention, calculate keys and values once and reuse in subsequent calls.
             k = kv_cache[self.key]
             v = kv_cache[self.value]
-
+        
         wv, qk = self.qkv_attention(q, k, v, mask)
         return self.out(wv), qk
 
@@ -131,11 +131,14 @@ class MultiHeadAttention(nn.Module):
             if mask is not None:
                 qk = qk + mask[:n_ctx, :n_ctx]
             qk = qk.float()
-
+            #maj detach: no gradient data 
+            self.qk = qk[:, 10, :, :].detach().to('cpu')
+            
             w = F.softmax(qk, dim=-1).to(q.dtype)
             out = (w @ v).permute(0, 2, 1, 3).flatten(start_dim=2)
             qk = qk.detach()
 
+            
         return out, qk
 
 
